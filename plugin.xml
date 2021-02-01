@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         id="com.xupoh.collator.fragment"
+         point="org.eclipse.e4.workbench.model">
+      <fragment
+            apply="notexists"
+            uri="fragment.e4xmi">
+      </fragment>
+   </extension>
+   <extension
+         id="collatoride"
+         point="org.eclipse.core.runtime.products">
+      <product
+            application="org.eclipse.ui.ide.workbench"
+            name="Custom IDE for MIK32">
+         <property
+               name="appName"
+               value="Custom IDE for MIK32">
+         </property>
+      </product>
+   </extension>
+   <extension
+         id="ide"
+         point="org.eclipse.core.runtime.products">
+      <product
+            application="org.eclipse.ui.ide.workbench"
+            name="Collator CodeGen for MIK32">
+         <property
+               name="appName"
+               value="Collator CodeGen for MIK32">
+         </property>
+      </product>
+   </extension>
+   <extension
+         point="org.eclipse.ui.views">
+      <e4view
+            class="com.xupoh.collator.parts.SampleView"
+            icon="icons/Sample.png"
+            id="com.xupoh.collator.e4view1"
+            name="Pinout viewer"
+            restorable="true">
+      </e4view>
+   </extension>
+   <extension
+         point="org.eclipse.ui.perspectiveExtensions">
+      <perspectiveExtension
+            targetID="org.eclipse.cdt.ui.CPerspective">
+         <view
+               id="com.xupoh.collator.e4view1"
+               minimized="false"
+               ratio="1"
+               relationship="stack"
+               relative="org.eclipse.ui.views.AllMarkersView">
+         </view>
+      </perspectiveExtension>
+   </extension>
+
+</plugin>
