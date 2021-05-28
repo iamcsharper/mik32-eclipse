@@ -1,6 +1,8 @@
 package com.xupoh.collator.canvas;
 
 import java.awt.geom.AffineTransform;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Color;
@@ -12,10 +14,14 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 
+import com.xupoh.collator.models.Side;
+
 public class CanvasButton implements ICanvasComponent {
 	private String str;
 	private int x;
 	private int y;
+
+	private static final Event emptyEvent = new Event();
 
 	private Rectangle rect;
 	private Point stringDimensions;
@@ -26,16 +32,22 @@ public class CanvasButton implements ICanvasComponent {
 	private boolean isHorizontal;
 
 	private boolean isActive = false;
+	private boolean isConfigured = false;
+	private boolean isNoChoice = false;
 
 	private MouseManager mouseManager;
 	private CanvasSpace space;
 
+	private List<CanvasBadge> badges = new ArrayList<>();
+	private Side side;
+
 	public CanvasButton(String str, int x, int y, boolean isHorizontal,
-			MouseManager mouseManager, CanvasSpace space) {
+			MouseManager mouseManager, CanvasSpace space, Side side) {
 		this.str = str;
 		this.x = x;
 		this.y = y;
 		this.isHorizontal = isHorizontal;
+		this.side = side;
 
 		this.mouseManager = mouseManager;
 		this.space = space;
@@ -43,8 +55,32 @@ public class CanvasButton implements ICanvasComponent {
 		this.rect = new Rectangle(x, y, 10, 10);
 	}
 
+	public void addBadge(CanvasBadge badge) {
+		this.badges.add(badge);
+	}
+
+	public void clearBadges() {
+		this.badges.clear();
+	}
+
 	public void setText(String text) {
 		this.str = text;
+	}
+
+	public boolean isConfigured() {
+		return isConfigured;
+	}
+
+	public boolean isNoChoice() {
+		return isNoChoice;
+	}
+
+	public void setNoChoice(boolean isNoChoice) {
+		this.isNoChoice = isNoChoice;
+	}
+
+	public void setConfigured(boolean isConfigured) {
+		this.isConfigured = isConfigured;
 	}
 
 	public void setActive(boolean isActive) {
@@ -89,6 +125,9 @@ public class CanvasButton implements ICanvasComponent {
 	@Override
 	public void draw(Display display, AffineTransform affineTransform,
 			Transform transform, GC gc) {
+		if (stringDimensions == null)
+			return;
+
 		if (isHorizontal) {
 			if (forcedWidth > 0) {
 				rect.width = forcedWidth;
@@ -118,8 +157,7 @@ public class CanvasButton implements ICanvasComponent {
 		if (isHover || isActive) {
 			if (isMouseDown) {
 				if (onClickListener != null && !prevWasClicked) {
-					onClickListener.handleEvent(new Event() {
-					});
+					onClickListener.handleEvent(emptyEvent);
 				}
 
 				gc.setBackground(display.getSystemColor(SWT.COLOR_RED));
@@ -128,35 +166,77 @@ public class CanvasButton implements ICanvasComponent {
 			}
 
 			gc.fillRectangle(rect);
+		} else if (isNoChoice) {
+			gc.setBackground(display.getSystemColor(SWT.COLOR_MAGENTA));
+			gc.fillRectangle(rect);
+		} else if (isConfigured) {
+			gc.setBackground(display.getSystemColor(SWT.COLOR_GREEN));
+			gc.fillRectangle(rect);
 		} else {
-
+			gc.setBackground(display.getSystemColor(SWT.COLOR_WHITE));
+			gc.fillRectangle(rect);
+			gc.setForeground(display.getSystemColor(SWT.COLOR_BLACK));
 			gc.drawRectangle(rect);
 		}
 
 		prevWasClicked = isMouseDown;
 
-		int tx = x + (rect.width - stringDimensions.x) / 2;
-		int ty = y + (rect.height - stringDimensions.y) / 2;
+		int tx, ty;
+
+		if (isHorizontal) {
+			// -----------
+			// | Text |
+			// -----------
+			tx = x + (rect.width - stringDimensions.x) / 2;
+			ty = y + (rect.height - stringDimensions.y) / 2;
+		} else {
+			// -------
+			// | 1 |
+			// | 1 |
+			// | 1 |
+			// | 1 |
+			// -------
+			tx = x + (rect.width - stringDimensions.y) / 2;
+			ty = y + (rect.height - stringDimensions.x) / 2;
+		}
 
 		float[] oldData = new float[6];
 
 		if (!isHorizontal) {
 			transform.getElements(oldData);
 
-			float offsetX = 0;
-			float offsetY = 0;
-
-			transform.translate((tx + offsetX), (ty + offsetY));
-			transform.rotate(-90);
-			transform.translate(-(tx + offsetX), -(ty + offsetY));
+			transform.translate(tx, ty);
+			transform.rotate((float) (-90));
+			transform.translate(-tx, -ty);
 
 			gc.setTransform(transform);
 
-			tx -= 24;
-			ty += 10;
+			tx -= stringDimensions.x;
+//			ty += 10;
 		}
 
-		gc.drawText(str, tx, ty, SWT.NO_BACKGROUND);
+		gc.drawText(str, tx, ty, SWT.DRAW_TRANSPARENT);
+
+		int spacing = side == Side.Top ? 20 : 10;
+
+		int sumOffset = spacing;
+
+		for (int i = 0; i < badges.size(); i++) {
+			final CanvasBadge badge = badges.get(i);
+			int off = -sumOffset;
+
+			if (side == Side.Right || side == Side.Top) {
+				badge.setOffset(0);
+				off = rect.width + sumOffset;
+			} else if (side == Side.Bottom) {
+				off -= 70;
+			}
+
+			sumOffset += badge.getWidth() + spacing;
+
+			badge.setPosition(x + off, ty);
+			badge.draw(display, affineTransform, transform, gc);
+		}
 
 		gc.setBackground(preservedColor);
 

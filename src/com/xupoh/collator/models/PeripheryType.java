@@ -1,4 +1,4 @@
-package com.xupoh.collator.parts.common;
+package com.xupoh.collator.models;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,13 +17,27 @@ public enum PeripheryType {
 	 */
 	SPI(4),
 	/**
-	 * Hardware timer suport
+	 * Hardware 16-bit timer support
 	 */
-	Timer(8),
+	Timer16(8),
+	/**
+	 * Hardware 32-bit timer support
+	 */
+	Timer32(16),
 	/**
 	 * Hardware JTAG debug support
 	 */
-	TDI(16);
+	TDI(32),
+	
+	/**
+	 * Configurable GPIO
+	 */
+	GPIO(64),
+	
+	/**
+	 * No peripheral, just Power/GND
+	 */
+	None(64);
 	
 	private int _val;
 	PeripheryType(int val){

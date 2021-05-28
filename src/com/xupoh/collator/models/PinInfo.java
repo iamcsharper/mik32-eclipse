@@ -1,4 +1,4 @@
-package com.xupoh.collator.parts.common;
+package com.xupoh.collator.models;
 
 import java.util.HashMap;
 import java.util.regex.Matcher;
@@ -9,6 +9,16 @@ public class PinInfo {
 
 	private int portNum = -1;
 	private int gpioId = -1;
+
+	private boolean isConfigured = false;
+
+	public boolean isConfigured() {
+		return isConfigured;
+	}
+
+	public void setConfigured(boolean isConfigured) {
+		this.isConfigured = isConfigured;
+	}
 
 	public int getId() {
 		return pinId;
@@ -55,7 +65,18 @@ public class PinInfo {
 		return modesInfo.get(id);
 	}
 
-	public int selectedModeId = 0;
+	private int selectedModeId = 0;
+
+	public void setSelectedModeId(int id) {
+		this.selectedModeId = id;
+		System.out.println("[PinInfo # " + pinId + "] the mode is set to " + id + "max = "
+				+ (this.modesInfo.size() - 1) + ", the pin is now configured");
+		this.setConfigured(true);
+	}
+
+	public int getSelectedModeId() {
+		return this.selectedModeId;
+	}
 
 	public String analogFunction = null;
 
@@ -74,8 +95,12 @@ public class PinInfo {
 	public PinInfo addMode(PinModeInfo modeInfo) throws IllegalArgumentException {
 		// First one
 		if (modesInfo.size() == 0) {
-			System.out.println("Set default mode of " + pinId + " to " + modeInfo.id);
 			selectedModeId = modeInfo.id;
+
+			// They may only have one func
+			if (modeInfo.type == PinType.GND || modeInfo.type == PinType.Power) {
+				this.setConfigured(true);
+			}
 		}
 
 		if (modesInfo.size() >= 3) {
@@ -101,13 +126,13 @@ public class PinInfo {
 		return this;
 	}
 
-	public PinModeInfo findModeForName(String name) {
+	public PinModeInfo findModeForPeriphery(Periphery p) {
 		for (PinModeInfo info : modesInfo.values()) {
-			if (name == "JTAG") {
+			if (p.getType().equals(PeripheryType.TDI)) {
 				// System.out.println("We are finding JTAG, got ")
 				if (GlobalConstants.JTAG_NAMES.contains(info.designation))
 					return info;
-			} else if (info.designation.contains(name))
+			} else if (info.designation.contains(p.type.toString()))
 				return info;
 		}
 

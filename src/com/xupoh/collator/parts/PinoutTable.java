@@ -14,23 +14,25 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Event;
-import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Table;
 
-import com.xupoh.collator.parts.common.PinInfo;
+import com.xupoh.collator.models.Mik32;
+import com.xupoh.collator.models.PinInfo;
+import com.xupoh.collator.models.PinModeInfo;
 
 public class PinoutTable extends TableViewer {
 
-	private Listener onPinModeChangeListener;
+	private Mik32 mik32;
 
-	public void setOnPinModeChangeListener(Listener listener) {
-		onPinModeChangeListener = listener;
-	}
-
-	public PinoutTable(Composite parent) {
+	public PinoutTable(Composite parent, Mik32 mik32) {
 		super(parent, SWT.MULTI | SWT.H_SCROLL | SWT.V_SCROLL | SWT.FULL_SELECTION
 				| SWT.BORDER);
+
+		this.mik32 = mik32;
+
+		mik32.addOnPinModeUpdateListener((int id, int mode, PinInfo info) -> {
+			this.refresh(true);
+		});
 
 		final Table table = getTable();
 
@@ -56,10 +58,10 @@ public class PinoutTable extends TableViewer {
 			protected int doCompare(Viewer viewer, Object e1, Object e2) {
 				PinInfo p1 = (PinInfo) e1;
 				PinInfo p2 = (PinInfo) e2;
-				return p1.getModeById(p1.selectedModeId).designation.compareToIgnoreCase(
-						p2.getModeById(p2.selectedModeId).designation);
+				return p1.getModeById(p1.getSelectedModeId()).designation
+						.compareToIgnoreCase(
+								p2.getModeById(p2.getSelectedModeId()).designation);
 			}
-
 		};
 
 		new ReusableColumnViewerComparator(this, colAnalog) {
@@ -93,27 +95,31 @@ public class PinoutTable extends TableViewer {
 			}
 		});
 
-		colName.getColumn().setWidth(100);
+		colName.getColumn().setWidth(120);
 		colName.getColumn().setText("Обозначение");
 		colName.setEditingSupport(new EditingSupport(this) {
 
 			@Override
 			protected void setValue(Object element, Object value) {
+				final PinInfo pinInfo = (PinInfo) element;
 				int modeId = ((Integer) value).intValue();
-				((PinInfo) element).selectedModeId = modeId;
+				
+				// Skip same
+				if (pinInfo.getSelectedModeId() == modeId) {
+					getViewer().update(element, null);
+					return;
+				}
+
+				System.out.println("Edited " + pinInfo.getId() + " to " + value);
+				
+				mik32.updatePinMode(pinInfo.getId() - 1, modeId);
 				getViewer().update(element, null);
-
-				Event event = new Event();
-				event.index = ((PinInfo) element).getId() - 1;
-				event.keyCode = modeId;
-
-				onPinModeChangeListener.handleEvent(event);
 			}
 
 			@Override
 			protected Object getValue(Object element) {
 				// We need to calculate back to the index
-				return Integer.valueOf(((PinInfo) element).selectedModeId);
+				return Integer.valueOf(((PinInfo) element).getSelectedModeId());
 			}
 
 			@Override
@@ -132,7 +138,16 @@ public class PinoutTable extends TableViewer {
 			@Override
 			public String getText(Object element) {
 				PinInfo p = (PinInfo) element;
-				return String.valueOf(p.getModeById(p.selectedModeId).designation);
+				final PinModeInfo m = p.getModeById(p.getSelectedModeId());
+				
+				if (m == null) {
+					System.err.println("RRRendering pinInfo " + p.getId() + ", selected mode = "
+							+ p.getSelectedModeId());
+					
+					return "WTF?";
+				}
+				
+				return m.designation;
 			}
 		});
 

@@ -1,4 +1,4 @@
-package com.xupoh.collator.parts.common;
+package com.xupoh.collator.models;
 
 public enum PinType {
 	Input, Output, IO, Power, GND, OSC;

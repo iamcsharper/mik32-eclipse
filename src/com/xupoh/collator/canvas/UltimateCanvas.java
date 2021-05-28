@@ -23,7 +23,7 @@ public class UltimateCanvas extends Canvas {
 	protected float zoom = 1f;
 
 	// The timer interval in milliseconds
-	private static final int TIMER_INTERVAL = 5;
+	private static final int TIMER_INTERVAL = 3;
 	private Runnable runner;
 
 	protected MouseManager mouseManager;

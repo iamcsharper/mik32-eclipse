@@ -10,7 +10,7 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 
-import com.xupoh.collator.parts.common.SWT2Dutil;
+import com.xupoh.collator.util.SWT2Dutil;
 
 public class CanvasVerticalButtonDropbox implements ICanvasComponent {
 	private boolean isOpen = false;

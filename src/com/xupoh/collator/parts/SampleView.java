@@ -35,9 +35,11 @@ import org.eclipse.ui.ISharedImages;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkbenchActionConstants;
 
-import com.xupoh.collator.parts.common.GlobalConstants;
-import com.xupoh.collator.parts.common.PinInfo;
-import com.xupoh.collator.parts.housings.Mik32;
+import com.xupoh.collator.logic.PinoutCanvasController;
+import com.xupoh.collator.logic.PinoutTableController;
+import com.xupoh.collator.logic.PinoutTreeController;
+import com.xupoh.collator.models.GlobalConstants;
+import com.xupoh.collator.models.Mik32;
 
 // add -clearPersistedState to arguments to clear workspace
 public class SampleView {
@@ -48,15 +50,133 @@ public class SampleView {
 	public static final String ID = "com.xupoh.collator.parts.SampleView";
 
 	@Inject
-	IWorkbench workbench;
-
-	private PinoutTable viewer;
+	public IWorkbench workbench;
 
 	private Action action1;
 	private Action action2;
 	private Action doubleClickAction;
 
-	private PinoutCanvas partDrawer;
+	/**
+	 * View Controllers
+	 */
+	private PinoutTreeController treeController;
+	private PinoutTableController tableController;
+	private PinoutCanvasController canvasController;
+
+	/**
+	 * Views
+	 */
+	private PinoutTable table;
+	private PinoutCanvas canvas;
+	private PinoutTree tree;
+
+	public static SampleView instance;
+
+	@PostConstruct
+	public void createPartControl(Composite parent) {
+		instance = this;
+
+		final Mik32 mik32 = new Mik32();
+
+		// Sash divides left and right parts (table&tree and canvas)
+		SashForm form = new SashForm(parent, SWT.HORIZONTAL | SWT.SMOOTH);
+		form.SASH_WIDTH = 5;
+		form.setBackground(parent.getDisplay().getSystemColor(SWT.COLOR_LIST_BACKGROUND));
+
+		// Container for all stuff located in left
+		Composite left = new Composite(form, SWT.None);
+		left.setLayout(new FillLayout(SWT.VERTICAL));
+
+		// TabFolder contains tab navigation buttons and content
+		final TabFolder tableTreeSwitcher = new TabFolder(left, SWT.None);
+
+		// Tab content containers
+		Composite tablePart = createLeftPartGridded(tableTreeSwitcher);
+		Composite treePart = createLeftPartGridded(tableTreeSwitcher);
+
+		// A navigation button to switch content to table view
+		TabItem item = new TabItem(tableTreeSwitcher, SWT.None);
+		item.setText("Table view");
+		item.setControl(tablePart);
+
+		// A navigation button to switch content to tree view
+		item = new TabItem(tableTreeSwitcher, SWT.None);
+		item.setText("Tree view");
+		item.setControl(treePart);
+
+		/// TREE TAB CONTENT
+
+		// Container for tree controls
+		Composite header = createTableControls(treePart);
+
+		Button btn = new Button(header, SWT.PUSH);
+		btn.setText("Test tree");
+
+		this.treeController = new PinoutTreeController(treePart, mik32);
+		this.tree = this.treeController.getView();
+		tree.setLayoutData(GlobalConstants.LAYOUT_GRID_FILL);
+
+		/// TABLE TAB CONTENT
+
+		// Container for table control buttons
+		header = createTableControls(tablePart);
+
+		Button button = new Button(header, SWT.PUSH);
+		button.setText("Load XML data");
+		button.setLayoutData(new RowData(150, 30));
+
+		button = new Button(header, SWT.PUSH);
+		button.setText("PAD config");
+		button.setLayoutData(new RowData(150, 30));
+		button.addListener(SWT.Selection, new Listener() {
+
+			@Override
+			public void handleEvent(Event event) {
+				tableController.onGenPadClick();
+			}
+
+		});
+
+		this.tableController = new PinoutTableController(tablePart, mik32);
+		this.table = this.tableController.getView();
+		table.getTable().setLayoutData(GlobalConstants.LAYOUT_GRID_FILL);
+
+		/// RIGHT PART
+
+		this.canvasController = new PinoutCanvasController(form, mik32);
+		this.canvas = canvasController.getView();
+
+		table.addSelectionChangedListener(new ISelectionChangedListener() {
+			public void selectionChanged(final SelectionChangedEvent event) {
+				// TODO: table row being selected, canvas pin dropbox being open
+				IStructuredSelection selection = (IStructuredSelection) event
+						.getSelection();
+//				System.err.println("Table selected pin #"
+//						+ ((PinInfo) selection.getFirstElement()).pinId);
+
+				tree.updateCheckboxes();
+			}
+		});
+
+		table.setInput(mik32.info.getPins());
+
+		canvas.setOnPinClickListener(new Listener() {
+			@Override
+			public void handleEvent(Event event) {
+				System.out.println("Canvas clicked pin " + event.index);
+				final Object obj = mik32.info.getPins().get(event.index);
+				ISelection selection = new StructuredSelection(obj);
+				table.setSelection(selection);
+				table.reveal(obj);
+			}
+		});
+
+		workbench.getHelpSystem().setHelp(table.getControl(),
+				"com.xupoh.collator.parts.viewer");
+		makeActions();
+		hookContextMenu();
+		// hookDoubleClickAction();
+	}
 
 	/**
 	 * Creates a composite with single-column grid layout
@@ -94,142 +214,6 @@ public class SampleView {
 		return header;
 	}
 
-	@PostConstruct
-	public void createPartControl(Composite parent) {
-		final Mik32 mik32 = new Mik32();
-
-		// Sash divides left and right parts (table&tree and canvas)
-		SashForm form = new SashForm(parent, SWT.HORIZONTAL | SWT.SMOOTH);
-		form.SASH_WIDTH = 5;
-		form.setBackground(parent.getDisplay().getSystemColor(SWT.COLOR_LIST_BACKGROUND));
-
-		// Container for all stuff located in left
-		Composite left = new Composite(form, SWT.None);
-		left.setLayout(new FillLayout(SWT.VERTICAL));
-
-		// TabFolder contains tab navigation buttons and content
-		final TabFolder tableTreeSwitcher = new TabFolder(left, SWT.None);
-
-		// Tab content containers
-		Composite tablePart = createLeftPartGridded(tableTreeSwitcher);
-		Composite treePart = createLeftPartGridded(tableTreeSwitcher);
-
-		// A navigation button to switch content to table view
-		TabItem item = new TabItem(tableTreeSwitcher, SWT.None);
-		item.setText("Table view");
-		item.setControl(tablePart);
-
-		// A navigation button to switch content to tree view
-		item = new TabItem(tableTreeSwitcher, SWT.None);
-		item.setText("Tree view");
-		item.setControl(treePart);
-
-		/// TREE TAB CONTENT
-
-		// Container for tree controls
-		Composite header = createTableControls(treePart);
-
-		Button btn = new Button(header, SWT.PUSH);
-		btn.setText("Test tree");
-
-		final PinoutTree tree = new PinoutTree(treePart, mik32);
-		tree.setLayoutData(GlobalConstants.LAYOUT_GRID_FILL);
-
-		/// TABLE TAB CONTENT
-
-		// Container for table control buttons
-		header = createTableControls(tablePart);
-
-		Button button = new Button(header, SWT.PUSH);
-		button.setText("Load XML data");
-		button.setLayoutData(new RowData(150, 30));
-
-		button = new Button(header, SWT.PUSH);
-		button.setText("Gen. PAD config");
-		button.setLayoutData(new RowData(150, 30));
-		button.addListener(SWT.Selection, new Listener() {
-
-			@Override
-			public void handleEvent(Event event) {
-				final int a = mik32.generatePort(0);
-				final int b = mik32.generatePort(1);
-				final int c = mik32.generatePort(2);
-				// System.out.println("Generated results: ");
-
-				StringBuilder sb = new StringBuilder();
-				sb.append("PortA = ");
-				sb.append(Integer.toHexString(a));
-				sb.append("\nPortB = ");
-				sb.append(Integer.toHexString(b));
-				sb.append("\nPortC = ");
-				sb.append(Integer.toHexString(c));
-
-				showMessage(sb.toString());
-			}
-
-		});
-
-		viewer = new PinoutTable(tablePart);
-		viewer.getTable().setLayoutData(GlobalConstants.LAYOUT_GRID_FILL);
-
-		/// RIGHT PART
-		partDrawer = new PinoutCanvas(form);
-
-		viewer.setOnPinModeChangeListener(new Listener() {
-
-			@Override
-			public void handleEvent(Event event) {
-				// System.err.println("Table changed pin #" + event.index + " state");
-				partDrawer.updatePinModeView(event.index, event.keyCode);
-			}
-		});
-
-		viewer.addSelectionChangedListener(new ISelectionChangedListener() {
-			public void selectionChanged(final SelectionChangedEvent event) {
-				// TODO: table row being selected, canvas pin dropbox being open
-				IStructuredSelection selection = (IStructuredSelection) event
-						.getSelection();
-//				System.err.println("Table selected pin #"
-//						+ ((PinInfo) selection.getFirstElement()).pinId);
-				
-				tree.updateCheckboxes();
-			}
-		});
-
-		viewer.setInput(mik32.getPins());
-
-		partDrawer.setHousing(mik32);
-		partDrawer.setOnPinClickListener(new Listener() {
-			@Override
-			public void handleEvent(Event event) {
-				// System.out.println("Canvas clicked pin " + event.index);
-				final Object obj = mik32.getPin(event.index);
-				ISelection selection = new StructuredSelection(obj);
-				viewer.setSelection(selection);
-				viewer.reveal(obj);
-			}
-		});
-
-		partDrawer.setOnPinModeChangeListener(new Listener() {
-			@Override
-			public void handleEvent(Event event) {
-				System.out.println("Canvas PinMode changed for pin #" + (event.index + 1)
-						+ " to = " + event.keyCode);
-
-				mik32.getPin(event.index).selectedModeId = event.keyCode;
-
-				viewer.refresh(true);
-				tree.updateCheckboxes();
-			}
-		});
-
-		workbench.getHelpSystem().setHelp(viewer.getControl(),
-				"com.xupoh.collator.parts.viewer");
-		makeActions();
-		hookContextMenu();
-		// hookDoubleClickAction();
-	}
-
 	private void hookContextMenu() {
 		MenuManager menuMgr = new MenuManager("#PopupMenu");
 		menuMgr.setRemoveAllWhenShown(true);
@@ -239,8 +223,8 @@ public class SampleView {
 				SampleView.this.fillContextMenu(manager);
 			}
 		});
-		Menu menu = menuMgr.createContextMenu(viewer.getControl());
-		viewer.getControl().setMenu(menu);
+		Menu menu = menuMgr.createContextMenu(table.getControl());
+		table.getControl().setMenu(menu);
 	}
 
 	private void fillContextMenu(IMenuManager manager) {
@@ -275,7 +259,7 @@ public class SampleView {
 		doubleClickAction = new Action() {
 			@Override
 			public void run() {
-				IStructuredSelection selection = viewer.getStructuredSelection();
+				IStructuredSelection selection = table.getStructuredSelection();
 				Object obj = selection.getFirstElement();
 				showMessage("Double-click detected on " + obj.toString());
 			}
@@ -283,7 +267,7 @@ public class SampleView {
 	}
 
 	private void hookDoubleClickAction() {
-		viewer.addDoubleClickListener(new IDoubleClickListener() {
+		table.addDoubleClickListener(new IDoubleClickListener() {
 			@Override
 			public void doubleClick(DoubleClickEvent event) {
 				doubleClickAction.run();
@@ -291,13 +275,13 @@ public class SampleView {
 		});
 	}
 
-	private void showMessage(String message) {
-		MessageDialog.openInformation(viewer.getControl().getShell(), "Pinout viewer",
+	public void showMessage(String message) {
+		MessageDialog.openInformation(table.getControl().getShell(), "Pinout viewer",
 				message);
 	}
 
 	@Focus
 	public void setFocus() {
-		viewer.getControl().setFocus();
+		table.getControl().setFocus();
 	}
 }

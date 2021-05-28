@@ -5,7 +5,7 @@ import java.awt.geom.AffineTransform;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.widgets.Event;
 
-import com.xupoh.collator.parts.common.SWT2Dutil;
+import com.xupoh.collator.util.SWT2Dutil;
 
 public class MouseManager {
 

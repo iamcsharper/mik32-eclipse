@@ -11,79 +11,150 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Listener;
 
+import com.xupoh.collator.canvas.CanvasBadge;
 import com.xupoh.collator.canvas.CanvasButton;
+import com.xupoh.collator.canvas.CanvasPowerBus;
+import com.xupoh.collator.canvas.CanvasPowerBus.Type;
 import com.xupoh.collator.canvas.CanvasSpace;
 import com.xupoh.collator.canvas.CanvasVerticalButtonDropbox;
 import com.xupoh.collator.canvas.UltimateCanvas;
-import com.xupoh.collator.parts.common.PinInfo;
-import com.xupoh.collator.parts.common.PinModeInfo;
-import com.xupoh.collator.parts.housings.AbstractHousing;
+import com.xupoh.collator.models.Mik32;
+import com.xupoh.collator.models.PinInfo;
+import com.xupoh.collator.models.PinModeInfo;
+import com.xupoh.collator.models.PinType;
+import com.xupoh.collator.models.Side;
 
 public class PinoutCanvas extends UltimateCanvas {
 
-	public AbstractHousing housing = null;
+	public static final int PIN_WIDTH = 120;
+
+	private Mik32 mik32;
 
 	private CanvasButton resetViewButton;
 	private CanvasVerticalButtonDropbox dropbox;
 	private List<CanvasButton> pinButtons;
 
-	private Listener onPinModeChangeListener;
 	private Listener onPinClickListener;
-
-	public void setOnPinModeChangeListener(Listener listener) {
-		onPinModeChangeListener = listener;
-	}
 
 	public void setOnPinClickListener(Listener listener) {
 		onPinClickListener = listener;
 	}
 
+	public PinoutCanvas(Composite parent, Mik32 mik32) {
+		super(parent);
+
+		this.mik32 = mik32;
+
+		initPinButtons();
+		resetView();
+		initButtons();
+		initEvents();
+
+		this.mik32.addOnPinModeUpdateListener((int id, int mode, PinInfo info) -> {
+			System.out.println("[PinoutCanvas] updating mode!");
+			this.updatePinModeView(id, mode, info);
+		});
+	}
+
 	private void initPinButtons() {
 		if (pinButtons != null) {
 			pinButtons.clear();
+		} else {
+			pinButtons = new ArrayList<>(mik32.info.getPins().size());
 		}
-
-		pinButtons = new ArrayList<>(housing.getPinsCount());
 
 		int x = 0;
 		int y = 0;
 		boolean isHorizontal = true;
+		Side side;
 
-		for (int i = 0; i < housing.getPinsCount(); ++i) {
+		for (int i = 0; i < mik32.info.getPins().size(); ++i) {
+			CanvasPowerBus bus = null;
+			final PinInfo pinInfo = mik32.info.getPins().get(i);
+
 			if (i < 16) { // Left
 				y = 20 * i;
-				x = -50;
+				x = -PIN_WIDTH;
 				isHorizontal = true;
+				side = Side.Left;
 			} else if (i < 32) { // Bottom
 				x = 20 * (i - 16);
 				y = 320;
 				isHorizontal = false;
+				side = Side.Bottom;
 			} else if (i < 48) { // Right
 				x = 320;
 				y = 20 * (47 - i);
 				isHorizontal = true;
+				side = Side.Right;
 			} else { // Top
 				x = 20 * (63 - i);
-				y = -50;
+				y = -PIN_WIDTH;
 				isHorizontal = false;
+				side = Side.Top;
 			}
 
-			int defModId = housing.getPin(i).selectedModeId;
+			if (pinInfo.getModesSize() == 1) {
 
-			final CanvasButton btn = new CanvasButton(
-					String.valueOf(i + 1) + " = " + defModId, x, y, isHorizontal,
-					mouseManager, CanvasSpace.World);
-			btn.setForcedLocalWidth(50);
-			btn.setForcedLocalHeight(20);
+				if (pinInfo.getSelectedMode().type == PinType.GND) {
+					bus = new CanvasPowerBus(Type.Ground, side, "GND");
+				} else if (pinInfo.getSelectedMode().type == PinType.Power) {
+					bus = new CanvasPowerBus(Type.Power, side,
+							pinInfo.getSelectedMode().designation);
+				}
 
-			final int pin = i;
-			final PinInfo pinInfo = housing.getPin(pin);
+			}
 
+			final CanvasButton btn = createPinButton(i, x, y, isHorizontal, side);
+
+			pinButtons.add(btn);
+			children.add(btn);
+
+			if (bus != null) {
+				int xBus = x;
+				int yBus = y;
+
+				if (side == Side.Left) {
+					yBus += 10;
+				} else if (side == Side.Bottom) {
+					xBus += 10;
+					yBus += PIN_WIDTH;
+				} else if (side == Side.Right) {
+					xBus += PIN_WIDTH;
+					yBus += 10;
+				} else if (side == Side.Top) {
+					xBus += 10;
+				}
+				bus.setPosition(xBus, yBus);
+				children.add(bus);
+			}
+		}
+
+	}
+
+	private CanvasButton createPinButton(int i, int x, int y, boolean isHorizontal,
+			Side side) {
+		int defModId = mik32.info.getPins().get(i).getSelectedModeId();
+		final String numStr = String.valueOf(i + 1);
+
+		final CanvasButton btn = new CanvasButton(numStr + " = " + defModId, x, y,
+				isHorizontal, mouseManager, CanvasSpace.World, side);
+		btn.setForcedLocalWidth(PIN_WIDTH);
+		btn.setForcedLocalHeight(20);
+
+		final int pin = i;
+		final PinInfo pinInfo = mik32.info.getPins().get(pin);
+
+		if (pinInfo.isConfigured() || pinInfo.getModesSize() == 1) {
+			btn.setText(numStr + " " + pinInfo.getModeById(0).designation);
+			btn.setNoChoice(true);
+		} else {
 			btn.setOnClickListener(new Listener() {
 
 				@Override
 				public void handleEvent(Event event) {
-					// TODO: reuse existing CanvasButton[] array inside dropbox, or resize
+					// TODO: reuse existing CanvasButton[] array inside dropbox, or
+					// resize
 					// & shrink
 					CanvasButton[] dropboxItems = new CanvasButton[pinInfo
 							.getModesSize()];
@@ -91,7 +162,7 @@ public class PinoutCanvas extends UltimateCanvas {
 					int j = 0;
 					for (PinModeInfo pinMode : pinInfo.getDistinctModes()) {
 						dropboxItems[j] = new CanvasButton(pinMode.designation, 0, 0,
-								true, mouseManager, CanvasSpace.Screen);
+								true, mouseManager, CanvasSpace.Screen, Side.Top);
 						j++;
 					}
 
@@ -139,20 +210,36 @@ public class PinoutCanvas extends UltimateCanvas {
 					dropbox.setIsOpen(true);
 				}
 			});
-
-			pinButtons.add(btn);
-			children.add(btn);
 		}
 
+		return btn;
 	}
 
-	public void updatePinModeView(int id, int mode) {
-		pinButtons.get(id).setText((id + 1) + " = " + mode);
+	public void updatePinModeView(int id, int mode, PinInfo info) {
+		final boolean isActive = info.isConfigured();
+		final CanvasButton b = pinButtons.get(id);
+		b.setText((id + 1) + " = " + mode);
+
+		b.clearBadges();
+
+		if (isActive) {
+			b.addBadge(new CanvasBadge(info.getSelectedMode().designation));
+
+			if (Math.random() > 0.6) {
+				b.addBadge(new CanvasBadge("40% шанс"));
+			}
+
+			if (Math.random() > 0.8) {
+				b.addBadge(new CanvasBadge("20% шанс"));
+			}
+		}
+
+		b.setConfigured(isActive);
 	}
 
 	private void initButtons() {
 		resetViewButton = new CanvasButton("Reset view", 10, 10, true, mouseManager,
-				CanvasSpace.Screen);
+				CanvasSpace.Screen, Side.Top);
 		resetViewButton.setOnClickListener(new Listener() {
 
 			@Override
@@ -168,16 +255,15 @@ public class PinoutCanvas extends UltimateCanvas {
 		dropbox.setOnItemSelectedListener(new Listener() {
 			@Override
 			public void handleEvent(Event event) {
-				event.keyCode = housing.getPin(event.index)
+				event.keyCode = mik32.info.getPins().get(event.index)
 						.getDistinctModes()[event.keyCode].id;
-				updatePinModeView(event.index, event.keyCode);
 
-				onPinModeChangeListener.handleEvent(event);
+				mik32.updatePinMode(event.index, event.keyCode);
 			}
 		});
 
-		children.add(resetViewButton);
-		children.add(dropbox);
+		// children.add(resetViewButton);
+		// children.add(dropbox);
 	}
 
 	private void initEvents() {
@@ -190,7 +276,7 @@ public class PinoutCanvas extends UltimateCanvas {
 
 				for (int i = 0; i < pinButtons.size(); ++i) {
 					if (pinButtons.get(i).getOuterRect().contains(p)) {
-						//System.out.println("Clicked pin #" + i);
+						// System.out.println("Clicked pin #" + i);
 						final Event evt = new Event();
 						evt.index = i;
 						if (onPinClickListener != null)
@@ -210,16 +296,11 @@ public class PinoutCanvas extends UltimateCanvas {
 		});
 	}
 
-	public PinoutCanvas(Composite parent) {
-		super(parent);
-
-		initButtons();
-
-		initEvents();
-	}
-
 	@Override
 	protected void paint(GC gc) {
+		if (this.pinButtons == null)
+			return;
+
 		super.paint(gc);
 
 		gc.setForeground(
@@ -252,7 +333,14 @@ public class PinoutCanvas extends UltimateCanvas {
 		for (int i = 0; i < pinButtons.size(); ++i) {
 			CanvasButton btn = pinButtons.get(i);
 			btn.updateStringDimensions(gc);
-			btn.draw(getDisplay(), affineTransform, transform, gc);
+		}
+
+		for (int i = 0; i < children.size(); ++i) {
+			children.get(i).update();
+		}
+
+		for (int i = 0; i < children.size(); ++i) {
+			children.get(i).draw(getDisplay(), affineTransform, transform, gc);
 		}
 
 		// Absolute positioning
@@ -263,13 +351,5 @@ public class PinoutCanvas extends UltimateCanvas {
 		resetViewButton.draw(getDisplay(), affineTransform, transform, gc);
 
 		dropbox.draw(getDisplay(), affineTransform, transform, gc);
-	}
-
-	public void setHousing(AbstractHousing housing) {
-		this.housing = housing;
-
-		initPinButtons();
-
-		resetView();
 	}
 }

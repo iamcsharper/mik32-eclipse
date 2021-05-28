@@ -1,4 +1,4 @@
-package com.xupoh.collator.parts.common;
+package com.xupoh.collator.models;
 
 public class PinModeInfo {
 	public int id;

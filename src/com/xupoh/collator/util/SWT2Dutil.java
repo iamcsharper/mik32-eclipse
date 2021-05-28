@@ -1,4 +1,4 @@
-package com.xupoh.collator.parts.common;
+package com.xupoh.collator.util;
 
 import java.awt.geom.AffineTransform;
 import java.awt.geom.Point2D;

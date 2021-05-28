@@ -1,4 +1,4 @@
-package com.xupoh.collator.parts.common;
+package com.xupoh.collator.models;
 
 import java.util.ArrayList;
 import java.util.List;
